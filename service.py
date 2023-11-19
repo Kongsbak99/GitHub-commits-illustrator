@@ -85,58 +85,65 @@ class Service:
 
 
     def buildGraph(self, commits: List[Dict]) -> Tuple[pydot.Dot, Dict[str, pydot.Node]]:
+        try: 
+            graph = pydot.Dot(graph_type='digraph')
+            nodes = {}
+
+            # First, create nodes for all commits
+            for commit in commits:
+                #message =  commit['oid'], label=commit['message'][:30] + '...'
+                #message2 = commit['oid'], label=commit['message']
+                # Truncation needs to be implemented, otherwise error will be thrown. 
+                # TODO Add functionality for non-truncation results if possible.
+                node = pydot.Node(commit['oid'], label=commit['message'][:30] + '...')
+                nodes[commit['oid']] = node
+
+            # Then, create edges between commits and their parents
+            for commit in commits:
+                node = nodes[commit['oid']]
+                graph.add_node(node)
+                for parent in commit.get('parents', {}).get('nodes', []):
+                    parent_oid = parent['oid']
+                    # Check if the parent commit has already been added to the graph
+                    if parent_oid not in nodes:
+                        # If not, create a new node for it
+                        parent_node = pydot.Node(parent_oid)
+                        nodes[parent_oid] = parent_node
+                        graph.add_node(parent_node)
+                    # Create an edge from the parent to the child
+                    graph.add_edge(pydot.Edge(nodes[parent_oid], node))
+
+            return graph, nodes
         
-        # Create a new graph
-        graph = pydot.Dot(graph_type='digraph')
-        nodes = {}
-
-        # First, create nodes for all commits
-        for commit in commits:
-            #message =  commit['oid'], label=commit['message'][:30] + '...'
-            #message2 = commit['oid'], label=commit['message']
-            # Truncation needs to be implemented, otherwise error will be thrown. 
-            # TODO Add functionality for non-truncation results if possible.
-            node = pydot.Node(commit['oid'], label=commit['message'][:30] + '...')
-            nodes[commit['oid']] = node
-
-        # Then, create edges between commits and their parents
-        for commit in commits:
-            node = nodes[commit['oid']]
-            graph.add_node(node)
-            for parent in commit.get('parents', {}).get('nodes', []):
-                parent_oid = parent['oid']
-                # Check if the parent commit has already been added to the graph
-                if parent_oid not in nodes:
-                    # If not, create a new node for it
-                    parent_node = pydot.Node(parent_oid)
-                    nodes[parent_oid] = parent_node
-                    graph.add_node(parent_node)
-                # Create an edge from the parent to the child
-                graph.add_edge(pydot.Edge(nodes[parent_oid], node))
-
-        return graph, nodes
+        except Exception as e:
+            print("Error: ", e)
+            raise e
 
 
     def verifyAcyclic(self, graph: pydot.Dot, nodes: Dict[str, pydot.Node]) -> bool:
-        # Check if the graph is acyclic
-        visited = set()
-        stack = set()
+        try:
+            visited = set()
+            stack = set()
 
-        def dfs(node_id: str) -> bool:
-            if node_id in stack:
-                return False
-            if node_id in visited:
+            def dfs(node_id: str) -> bool:
+                if node_id in stack:
+                    return False
+                if node_id in visited:
+                    return True
+
+                visited.add(node_id)
+                stack.add(node_id)
+
+                for edge in graph.get_edges():
+                    src, dst = edge.get_source(), edge.get_destination()
+                    if src == node_id and not dfs(dst):
+                        return False
+
+                stack.remove(node_id)
                 return True
 
-            visited.add(node_id)
-            stack.add(node_id)
-
-            for edge in graph.get_edges():
-                src, dst = edge.get_source(), edge.get_destination()
-                if src == node_id and not dfs(dst):
-                    return False
-
-            stack.remove(node_id)
-            return True
-
-        return all(dfs(node.get_name()) for node in nodes.values())
+            return all(dfs(node.get_name()) for node in nodes.values())
+        
+        except Exception as e:
+            print("Error: ", e)
+            raise e
