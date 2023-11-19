@@ -1,0 +1,8 @@
+
+
+.env
+.vscode
+
+images/*
+
+__pycache__/
